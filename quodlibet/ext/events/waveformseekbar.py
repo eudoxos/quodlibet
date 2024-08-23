@@ -32,6 +32,22 @@ from quodlibet.util import connect_destroy, print_d
 from quodlibet.util.path import uri2gsturi
 
 
+class WaveformFloating(Gtk.Window):
+    x_off=None
+    def __init__(self, text):
+        super().__init__(type=Gtk.WindowType.POPUP)
+        self.set_decorated(False)
+        self.label = Gtk.Label(label=text)
+        self.label.set_padding(5,0)
+        self.cursor_size=Gdk.Display.get_default_cursor_size(Gdk.Display.get_default())
+        self.add(self.label)
+        self.show_all()
+    def moved(self, x, y, text):
+        self.label.set_text(text)
+        self.move(x + self.cursor_size//2 + 10, y + 10)
+
+
+
 class WaveformSeekBar(Gtk.Box):
     """A widget containing labels and the seekbar."""
 
@@ -41,6 +57,7 @@ class WaveformSeekBar(Gtk.Box):
         self._player = player
         self._rms_vals = []
         self._hovering = False
+        self._hover_floating = None
 
         self._elapsed_label = TimeLabel()
         self._remaining_label = TimeLabel()
@@ -272,6 +289,13 @@ class WaveformSeekBar(Gtk.Box):
         else:
             self._waveform_scale.queue_draw()
 
+        # floating window
+        pos = util.format_time(self._waveform_scale.get_mouse_position())
+        if not self._hover_floating:
+            self._hover_floating = WaveformFloating(text=pos)
+        else:
+            self._hover_floating.moved(event.x_root, event.y_root, text=pos)
+
         self._update_label(self._player)
         self._hovering = True
 
@@ -281,6 +305,10 @@ class WaveformSeekBar(Gtk.Box):
 
         self._hovering = False
         self._update_label(self._player)
+
+        if self._hover_floating:
+            self._hover_floating.destroy()
+            self._hover_floating = None
 
     def _resize_labels(self, song):
         """Resize the labels to make sure there is enough space to display the
@@ -356,6 +384,7 @@ class WaveformScale(Gtk.EventBox):
         return self._compute_redraw_area_between(last_position_x, position_x)
 
     def compute_hover_redraw_area(self):
+        # TODO: add WaveformFloating label to the calculation as well (otherwise it leaves articacts when moving left)
         return self._compute_redraw_area_between(self._last_mouse_position,
                                                  self.mouse_position)
 
